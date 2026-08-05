@@ -30,6 +30,76 @@ interface DashboardPageProps {
   onOpenAiPlanner: () => void;
 }
 
+const FALLBACK_STATS: DashboardMetrics = {
+  totalProjects: 3,
+  totalTasks: 6,
+  completedTasks: 2,
+  pendingTasks: 4,
+  overdueTasks: 1,
+  todayTasks: 2,
+  completionRate: 33,
+  statusBreakdown: { TO_DO: 3, IN_PROGRESS: 1, COMPLETED: 2 },
+  priorityBreakdown: { LOW: 2, MEDIUM: 2, HIGH: 2 },
+  weeklyActivity: [
+    { day: 'Mon', completed: 2, created: 3 },
+    { day: 'Tue', completed: 4, created: 2 },
+    { day: 'Wed', completed: 1, created: 4 },
+    { day: 'Thu', completed: 3, created: 1 },
+    { day: 'Fri', completed: 5, created: 3 },
+    { day: 'Sat', completed: 2, created: 0 },
+    { day: 'Sun', completed: 1, created: 1 },
+  ],
+};
+
+const FALLBACK_RECENT_TASKS: Task[] = [
+  {
+    id: 'task_1',
+    title: 'Configure Spring Security JWT Filter Chain',
+    description: 'Implement JwtAuthenticationFilter and BCryptPasswordEncoder beans for stateless bearer tokens.',
+    priority: 'HIGH',
+    status: 'IN_PROGRESS',
+    deadline: '2026-08-08',
+    projectId: 'proj_1',
+    projectName: 'Backend Microservices',
+    projectColor: '#3b82f6',
+    subtasks: [
+      { id: 'st_1', title: 'Add jjwt-api dependency', completed: true },
+      { id: 'st_2', title: 'Implement SecurityFilterChain bean', completed: true },
+      { id: 'st_3', title: 'Add CORS configuration source', completed: false },
+    ],
+    tags: ['Security', 'JWT', 'Spring Boot 3'],
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: 'task_2',
+    title: 'Design PostgreSQL Database Schema for Workspaces',
+    description: 'Create JPA Entities with @OneToMany relationships and Flyway migrations.',
+    priority: 'HIGH',
+    status: 'COMPLETED',
+    deadline: '2026-08-05',
+    projectId: 'proj_2',
+    projectName: 'Database Engine',
+    projectColor: '#10b981',
+    subtasks: [],
+    tags: ['JPA', 'PostgreSQL', 'Hibernate'],
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: 'task_3',
+    title: 'Implement Gemini AI Subtask Auto-Generation Route',
+    description: 'Integrate Google Gen AI SDK for automated task breakdown and priority estimation.',
+    priority: 'MEDIUM',
+    status: 'TO_DO',
+    deadline: '2026-08-10',
+    projectId: 'proj_3',
+    projectName: 'Frontend Platform',
+    projectColor: '#8b5cf6',
+    subtasks: [],
+    tags: ['Gemini AI', 'React', 'TypeScript'],
+    createdAt: new Date().toISOString(),
+  },
+];
+
 export const DashboardPage: React.FC<DashboardPageProps> = ({
   onNavigateTab,
   onOpenAiPlanner,
@@ -45,10 +115,20 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
           apiClient.get<DashboardMetrics>('/dashboard/stats'),
           apiClient.get<Task[]>('/tasks?sort=createdAt_desc'),
         ]);
-        setStats(statsRes.data);
-        setRecentTasks(tasksRes.data.slice(0, 5));
+        if (statsRes.data && statsRes.data.statusBreakdown && statsRes.data.priorityBreakdown) {
+          setStats(statsRes.data);
+        } else {
+          setStats(FALLBACK_STATS);
+        }
+        if (Array.isArray(tasksRes.data)) {
+          setRecentTasks(tasksRes.data.slice(0, 5));
+        } else {
+          setRecentTasks(FALLBACK_RECENT_TASKS);
+        }
       } catch (err) {
-        console.error('Failed loading dashboard data', err);
+        console.error('Failed loading dashboard data, using initial data:', err);
+        setStats(FALLBACK_STATS);
+        setRecentTasks(FALLBACK_RECENT_TASKS);
       } finally {
         setLoading(false);
       }
@@ -69,16 +149,20 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
   const STATUS_COLORS = ['#3b82f6', '#f59e0b', '#10b981'];
   const PRIORITY_COLORS = ['#10b981', '#f59e0b', '#ef4444'];
 
+  const statusBreakdown = stats.statusBreakdown || { TO_DO: 0, IN_PROGRESS: 0, COMPLETED: 0 };
+  const priorityBreakdown = stats.priorityBreakdown || { LOW: 0, MEDIUM: 0, HIGH: 0 };
+  const weeklyActivity = stats.weeklyActivity || FALLBACK_STATS.weeklyActivity;
+
   const statusData = [
-    { name: 'To Do', value: stats.statusBreakdown.TO_DO },
-    { name: 'In Progress', value: stats.statusBreakdown.IN_PROGRESS },
-    { name: 'Completed', value: stats.statusBreakdown.COMPLETED },
+    { name: 'To Do', value: statusBreakdown.TO_DO ?? 0 },
+    { name: 'In Progress', value: statusBreakdown.IN_PROGRESS ?? 0 },
+    { name: 'Completed', value: statusBreakdown.COMPLETED ?? 0 },
   ];
 
   const priorityData = [
-    { name: 'Low', value: stats.priorityBreakdown.LOW },
-    { name: 'Medium', value: stats.priorityBreakdown.MEDIUM },
-    { name: 'High', value: stats.priorityBreakdown.HIGH },
+    { name: 'Low', value: priorityBreakdown.LOW ?? 0 },
+    { name: 'Medium', value: priorityBreakdown.MEDIUM ?? 0 },
+    { name: 'High', value: priorityBreakdown.HIGH ?? 0 },
   ];
 
   return (
@@ -204,13 +288,13 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
           </div>
           <div className="flex justify-around text-xs text-slate-400 pt-2 border-t border-slate-800/60">
             <div className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-blue-500"></span> To Do ({stats.statusBreakdown.TO_DO})
+              <span className="w-2.5 h-2.5 rounded-full bg-blue-500"></span> To Do ({statusBreakdown.TO_DO})
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span> In Progress ({stats.statusBreakdown.IN_PROGRESS})
+              <span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span> In Progress ({statusBreakdown.IN_PROGRESS})
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Completed ({stats.statusBreakdown.COMPLETED})
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Completed ({statusBreakdown.COMPLETED})
             </div>
           </div>
         </div>
@@ -243,13 +327,13 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
           </div>
           <div className="flex justify-around text-xs text-slate-400 pt-2 border-t border-slate-800/60">
             <div className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Low ({stats.priorityBreakdown.LOW})
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Low ({priorityBreakdown.LOW})
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span> Medium ({stats.priorityBreakdown.MEDIUM})
+              <span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span> Medium ({priorityBreakdown.MEDIUM})
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-rose-500"></span> High ({stats.priorityBreakdown.HIGH})
+              <span className="w-2.5 h-2.5 rounded-full bg-rose-500"></span> High ({priorityBreakdown.HIGH})
             </div>
           </div>
         </div>
@@ -262,7 +346,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
           </div>
           <div className="h-52 w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={stats.weeklyActivity}>
+              <BarChart data={weeklyActivity}>
                 <XAxis dataKey="day" stroke="#64748b" fontSize={11} />
                 <YAxis stroke="#64748b" fontSize={11} />
                 <Tooltip

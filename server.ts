@@ -1,4 +1,5 @@
 import express, { Request, Response } from 'express';
+import cors from 'cors';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
 import dotenv from 'dotenv';
@@ -9,7 +10,10 @@ dotenv.config();
 const app = express();
 const PORT = 3000;
 
+app.use(cors());
 app.use(express.json());
+
+const apiRouter = express.Router();
 
 // Initialize Gemini Client server-side
 const ai = process.env.GEMINI_API_KEY
@@ -195,7 +199,7 @@ const generateJWT = (userId: string, email: string) => {
 // ==================== REST API ROUTES ==================== //
 
 // AUTH API
-app.post('/api/auth/login', (req: Request, res: Response) => {
+apiRouter.post('/auth/login', (req: Request, res: Response) => {
   const { email, password } = req.body;
   const user = users.find((u) => u.email.toLowerCase() === email?.toLowerCase());
 
@@ -221,7 +225,7 @@ app.post('/api/auth/login', (req: Request, res: Response) => {
   });
 });
 
-app.post('/api/auth/register', (req: Request, res: Response) => {
+apiRouter.post('/auth/register', (req: Request, res: Response) => {
   const { name, email, password } = req.body;
 
   if (!name || !email || !password) {
@@ -269,12 +273,12 @@ app.post('/api/auth/register', (req: Request, res: Response) => {
   });
 });
 
-app.get('/api/auth/me', (req: Request, res: Response) => {
+apiRouter.get('/auth/me', (req: Request, res: Response) => {
   const user = users[0]; // Active user
   return res.json(user);
 });
 
-app.post('/api/auth/change-password', (req: Request, res: Response) => {
+apiRouter.post('/auth/change-password', (req: Request, res: Response) => {
   const { currentPassword, newPassword } = req.body;
   if (!currentPassword || !newPassword) {
     return res.status(400).json({ message: 'Current and new password are required' });
@@ -283,7 +287,7 @@ app.post('/api/auth/change-password', (req: Request, res: Response) => {
 });
 
 // DASHBOARD METRICS API
-app.get('/api/dashboard/stats', (req: Request, res: Response) => {
+apiRouter.get('/dashboard/stats', (req: Request, res: Response) => {
   const totalProjects = projects.filter((p) => !p.isArchived).length;
   const totalTasks = tasks.length;
   const completedTasks = tasks.filter((t) => t.status === 'COMPLETED').length;
@@ -332,7 +336,7 @@ app.get('/api/dashboard/stats', (req: Request, res: Response) => {
 });
 
 // PROJECTS API
-app.get('/api/projects', (req: Request, res: Response) => {
+apiRouter.get('/projects', (req: Request, res: Response) => {
   const showArchived = req.query.archived === 'true';
   const filtered = projects
     .filter((p) => (showArchived ? true : !p.isArchived))
@@ -348,7 +352,7 @@ app.get('/api/projects', (req: Request, res: Response) => {
   return res.json(filtered);
 });
 
-app.post('/api/projects', (req: Request, res: Response) => {
+apiRouter.post('/projects', (req: Request, res: Response) => {
   const { name, description, category, color } = req.body;
   if (!name) {
     return res.status(400).json({ message: 'Project name is required' });
@@ -372,7 +376,7 @@ app.post('/api/projects', (req: Request, res: Response) => {
   return res.status(201).json(newProject);
 });
 
-app.put('/api/projects/:id', (req: Request, res: Response) => {
+apiRouter.put('/projects/:id', (req: Request, res: Response) => {
   const { id } = req.params;
   const index = projects.findIndex((p) => p.id === id);
   if (index === -1) {
@@ -388,7 +392,7 @@ app.put('/api/projects/:id', (req: Request, res: Response) => {
   return res.json(projects[index]);
 });
 
-app.patch('/api/projects/:id/archive', (req: Request, res: Response) => {
+apiRouter.patch('/projects/:id/archive', (req: Request, res: Response) => {
   const { id } = req.params;
   const project = projects.find((p) => p.id === id);
   if (!project) {
@@ -400,7 +404,7 @@ app.patch('/api/projects/:id/archive', (req: Request, res: Response) => {
   return res.json(project);
 });
 
-app.delete('/api/projects/:id', (req: Request, res: Response) => {
+apiRouter.delete('/projects/:id', (req: Request, res: Response) => {
   const { id } = req.params;
   projects = projects.filter((p) => p.id !== id);
   tasks = tasks.filter((t) => t.projectId !== id); // Cascade delete tasks
@@ -408,7 +412,7 @@ app.delete('/api/projects/:id', (req: Request, res: Response) => {
 });
 
 // TASKS API
-app.get('/api/tasks', (req: Request, res: Response) => {
+apiRouter.get('/tasks', (req: Request, res: Response) => {
   let result = [...tasks];
 
   const { status, priority, projectId, search, isOverdueOnly, isTodayOnly, sort } = req.query;
@@ -476,7 +480,7 @@ app.get('/api/tasks', (req: Request, res: Response) => {
   return res.json(enriched);
 });
 
-app.post('/api/tasks', (req: Request, res: Response) => {
+apiRouter.post('/tasks', (req: Request, res: Response) => {
   const { title, description, priority, status, deadline, projectId, subtasks, tags } = req.body;
 
   if (!title) {
@@ -508,7 +512,7 @@ app.post('/api/tasks', (req: Request, res: Response) => {
   });
 });
 
-app.put('/api/tasks/:id', (req: Request, res: Response) => {
+apiRouter.put('/tasks/:id', (req: Request, res: Response) => {
   const { id } = req.params;
   const index = tasks.findIndex((t) => t.id === id);
   if (index === -1) {
@@ -529,7 +533,7 @@ app.put('/api/tasks/:id', (req: Request, res: Response) => {
   });
 });
 
-app.patch('/api/tasks/:id/status', (req: Request, res: Response) => {
+apiRouter.patch('/tasks/:id/status', (req: Request, res: Response) => {
   const { id } = req.params;
   const { status } = req.body;
   const task = tasks.find((t) => t.id === id);
@@ -542,14 +546,14 @@ app.patch('/api/tasks/:id/status', (req: Request, res: Response) => {
   return res.json(task);
 });
 
-app.delete('/api/tasks/:id', (req: Request, res: Response) => {
+apiRouter.delete('/tasks/:id', (req: Request, res: Response) => {
   const { id } = req.params;
   tasks = tasks.filter((t) => t.id !== id);
   return res.json({ message: 'Task deleted successfully' });
 });
 
 // USER PROFILE API
-app.put('/api/users/profile', (req: Request, res: Response) => {
+apiRouter.put('/users/profile', (req: Request, res: Response) => {
   const { name, bio, jobTitle, avatar } = req.body;
   users[0] = {
     ...users[0],
@@ -562,7 +566,7 @@ app.put('/api/users/profile', (req: Request, res: Response) => {
 });
 
 // GEMINI AI INTEGRATION API
-app.post('/api/ai/breakdown', async (req: Request, res: Response) => {
+apiRouter.post('/ai/breakdown', async (req: Request, res: Response) => {
   const { taskTitle, taskDescription } = req.body;
 
   if (!taskTitle) {
@@ -629,7 +633,7 @@ Description: "${taskDescription || 'No description provided'}"`;
   }
 });
 
-app.post('/api/ai/daily-plan', async (req: Request, res: Response) => {
+apiRouter.post('/ai/daily-plan', async (req: Request, res: Response) => {
   const activeTasks = tasks.filter((t) => t.status !== 'COMPLETED');
 
   if (!ai) {
@@ -679,6 +683,23 @@ app.post('/api/ai/daily-plan', async (req: Request, res: Response) => {
   }
 });
 
+// Normalize request URLs for Vercel or proxies if /api prefix was stripped
+app.use((req: Request, res: Response, next) => {
+  if (
+    !req.url.startsWith('/api') &&
+    (req.url.startsWith('/auth') ||
+      req.url.startsWith('/ai') ||
+      req.url.startsWith('/dashboard') ||
+      req.headers['content-type'] === 'application/json' ||
+      req.headers['accept']?.includes('application/json'))
+  ) {
+    req.url = '/api' + req.url;
+  }
+  next();
+});
+
+app.use('/api', apiRouter);
+
 // VITE DEV / PRODUCTION MIDDLEWARE
 async function startServer() {
   if (process.env.NODE_ENV !== 'production') {
@@ -700,4 +721,8 @@ async function startServer() {
   });
 }
 
-startServer();
+if (!process.env.VERCEL) {
+  startServer();
+}
+
+export default app;
