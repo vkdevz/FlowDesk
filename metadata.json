@@ -1,0 +1,6 @@
+{
+  "name": "FlowDesk",
+  "description": "Smart Task & Productivity Management System built with Java Spring Boot, React, and Gemini AI.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
