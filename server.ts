@@ -82,9 +82,9 @@ interface TaskRecord {
   tags: string[];
 }
 
-let users: UserRecord[] = [];
-let projects: ProjectRecord[] = [];
-let tasks: TaskRecord[] = [];
+let defaultUsers: UserRecord[] = [];
+let defaultProjects: ProjectRecord[] = [];
+let defaultTasks: TaskRecord[] = [];
 
 const loadData = () => {
   try {
@@ -94,16 +94,16 @@ const loadData = () => {
         ? path.join(DATA_DIR, file) 
         : path.join(defaultDataDir, file);
 
-    if (fs.existsSync(readPath('users.json'))) users = JSON.parse(fs.readFileSync(readPath('users.json'), 'utf-8'));
-    if (fs.existsSync(readPath('projects.json'))) projects = JSON.parse(fs.readFileSync(readPath('projects.json'), 'utf-8'));
-    if (fs.existsSync(readPath('tasks.json'))) tasks = JSON.parse(fs.readFileSync(readPath('tasks.json'), 'utf-8'));
+    if (fs.existsSync(readPath('users.json'))) defaultUsers = JSON.parse(fs.readFileSync(readPath('users.json'), 'utf-8'));
+    if (fs.existsSync(readPath('projects.json'))) defaultProjects = JSON.parse(fs.readFileSync(readPath('projects.json'), 'utf-8'));
+    if (fs.existsSync(readPath('tasks.json'))) defaultTasks = JSON.parse(fs.readFileSync(readPath('tasks.json'), 'utf-8'));
   } catch (e) {
     console.error('Error loading persistent data store:', e);
   }
 
   // Fallback seed data in case Vercel filesystem reads fail
-  if (users.length === 0) {
-    users = [
+  if (defaultUsers.length === 0) {
+    defaultUsers = [
       {
         "id": "usr-1",
         "name": "demo user",
@@ -122,15 +122,6 @@ const loadData = () => {
   }
 };
 
-const saveData = () => {
-  try {
-    fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
-    fs.writeFileSync(PROJECTS_FILE, JSON.stringify(projects, null, 2));
-    fs.writeFileSync(TASKS_FILE, JSON.stringify(tasks, null, 2));
-  } catch (e) {
-    console.error('Error saving persistent data store:', e);
-  }
-};
 
 loadData();
 
@@ -155,12 +146,36 @@ const getUserIdFromReq = (req: Request): string | null => {
   }
 };
 
+
+interface DataStore {
+  users: UserRecord[];
+  projects: ProjectRecord[];
+  tasks: TaskRecord[];
+  lastAccessed: number;
+}
+const stores: Record<string, DataStore> = {};
+
+const getStore = (req: Request) => {
+  const ip = (req.headers['x-forwarded-for'] as string) || req.socket?.remoteAddress || 'unknown';
+  if (!stores[ip]) {
+    stores[ip] = {
+      users: JSON.parse(JSON.stringify(defaultUsers)),
+      projects: JSON.parse(JSON.stringify(defaultProjects)),
+      tasks: JSON.parse(JSON.stringify(defaultTasks)),
+      lastAccessed: Date.now()
+    };
+  }
+  stores[ip].lastAccessed = Date.now();
+  return stores[ip];
+};
+
 // ==================== REST API ROUTES ==================== //
 
 // AUTH API
 apiRouter.post('/auth/login', (req: Request, res: Response) => {
+  const store = getStore(req);
   const { email, password } = req.body;
-  const user = users.find((u) => u.email.toLowerCase() === email?.trim()?.toLowerCase());
+  const user = store.users.find((u) => u.email.toLowerCase() === email?.trim()?.toLowerCase());
 
   if (!user || user.passwordHash !== password) {
     return res.status(401).json({
@@ -184,6 +199,7 @@ apiRouter.post('/auth/login', (req: Request, res: Response) => {
 });
 
 apiRouter.post('/auth/register', (req: Request, res: Response) => {
+  const store = getStore(req);
   const { name, email, password } = req.body;
 
   if (!name?.trim() || !email?.trim() || !password?.trim()) {
@@ -195,7 +211,7 @@ apiRouter.post('/auth/register', (req: Request, res: Response) => {
     });
   }
 
-  const existing = users.find((u) => u.email.toLowerCase() === email.trim().toLowerCase());
+  const existing = store.users.find((u) => u.email.toLowerCase() === email.trim().toLowerCase());
   if (existing) {
     return res.status(400).json({
       status: 400,
@@ -217,7 +233,7 @@ apiRouter.post('/auth/register', (req: Request, res: Response) => {
     createdAt: new Date().toISOString(),
   };
 
-  users.push(newUser);
+  store.users.push(newUser);
 
   // Auto-create default project workspace for new account
   const defaultProject: ProjectRecord = {
@@ -231,9 +247,8 @@ apiRouter.post('/auth/register', (req: Request, res: Response) => {
     updatedAt: new Date().toISOString(),
     userId: newUser.id,
   };
-  projects.unshift(defaultProject);
+  store.projects.unshift(defaultProject);
 
-  saveData();
 
   const token = generateJWT(newUser.id, newUser.email);
 
@@ -248,12 +263,13 @@ apiRouter.post('/auth/register', (req: Request, res: Response) => {
 });
 
 apiRouter.get('/auth/me', (req: Request, res: Response) => {
+  const store = getStore(req);
   const userId = getUserIdFromReq(req);
   if (!userId) {
     return res.status(401).json({ message: 'Unauthorized session' });
   }
 
-  const user = users.find((u) => u.id === userId);
+  const user = store.users.find((u) => u.id === userId);
   if (!user) {
     return res.status(404).json({ message: 'User profile not found' });
   }
@@ -271,27 +287,28 @@ apiRouter.get('/auth/me', (req: Request, res: Response) => {
 });
 
 apiRouter.post('/auth/change-password', (req: Request, res: Response) => {
+  const store = getStore(req);
   const userId = getUserIdFromReq(req);
   if (!userId) return res.status(401).json({ message: 'Unauthorized' });
 
   const { currentPassword, newPassword } = req.body;
-  const user = users.find((u) => u.id === userId);
+  const user = store.users.find((u) => u.id === userId);
 
   if (!user || user.passwordHash !== currentPassword) {
     return res.status(400).json({ message: 'Current password is incorrect' });
   }
 
   user.passwordHash = newPassword;
-  saveData();
 
   return res.json({ message: 'Password updated successfully' });
 });
 
 // DASHBOARD METRICS API
 apiRouter.get('/dashboard/stats', (req: Request, res: Response) => {
+  const store = getStore(req);
   const userId = getUserIdFromReq(req);
-  const userProjects = projects.filter((p) => p.userId === userId);
-  const userTasks = tasks.filter((t) => t.userId === userId);
+  const userProjects = store.projects.filter((p) => p.userId === userId);
+  const userTasks = store.tasks.filter((t) => t.userId === userId);
 
   const totalProjects = userProjects.filter((p) => !p.isArchived).length;
   const totalTasks = userTasks.length;
@@ -342,15 +359,16 @@ apiRouter.get('/dashboard/stats', (req: Request, res: Response) => {
 
 // PROJECTS API
 apiRouter.get('/projects', (req: Request, res: Response) => {
+  const store = getStore(req);
   const userId = getUserIdFromReq(req);
   const showArchived = req.query.archived === 'true';
 
-  const userProjects = projects.filter(
+  const userProjects = store.projects.filter(
     (p) => p.userId === userId && (showArchived ? true : !p.isArchived)
   );
 
   const filtered = userProjects.map((p) => {
-    const projTasks = tasks.filter((t) => t.projectId === p.id && t.userId === userId);
+    const projTasks = store.tasks.filter((t) => t.projectId === p.id && t.userId === userId);
     const completed = projTasks.filter((t) => t.status === 'COMPLETED').length;
     return {
       ...p,
@@ -363,6 +381,7 @@ apiRouter.get('/projects', (req: Request, res: Response) => {
 });
 
 apiRouter.post('/projects', (req: Request, res: Response) => {
+  const store = getStore(req);
   const userId = getUserIdFromReq(req);
   if (!userId) return res.status(401).json({ message: 'Unauthorized' });
 
@@ -383,8 +402,7 @@ apiRouter.post('/projects', (req: Request, res: Response) => {
     userId,
   };
 
-  projects.unshift(newProject);
-  saveData();
+  store.projects.unshift(newProject);
 
   return res.status(201).json({
     ...newProject,
@@ -394,52 +412,53 @@ apiRouter.post('/projects', (req: Request, res: Response) => {
 });
 
 apiRouter.put('/projects/:id', (req: Request, res: Response) => {
+  const store = getStore(req);
   const userId = getUserIdFromReq(req);
   const { id } = req.params;
-  const index = projects.findIndex((p) => p.id === id && p.userId === userId);
+  const index = store.projects.findIndex((p) => p.id === id && p.userId === userId);
   if (index === -1) {
     return res.status(404).json({ message: 'Project not found' });
   }
 
-  projects[index] = {
-    ...projects[index],
+  store.projects[index] = {
+    ...store.projects[index],
     ...req.body,
     updatedAt: new Date().toISOString(),
   };
 
-  saveData();
-  return res.json(projects[index]);
+  return res.json(store.projects[index]);
 });
 
 apiRouter.patch('/projects/:id/archive', (req: Request, res: Response) => {
+  const store = getStore(req);
   const userId = getUserIdFromReq(req);
   const { id } = req.params;
-  const project = projects.find((p) => p.id === id && p.userId === userId);
+  const project = store.projects.find((p) => p.id === id && p.userId === userId);
   if (!project) {
     return res.status(404).json({ message: 'Project not found' });
   }
 
   project.isArchived = !project.isArchived;
   project.updatedAt = new Date().toISOString();
-  saveData();
 
   return res.json(project);
 });
 
 apiRouter.delete('/projects/:id', (req: Request, res: Response) => {
+  const store = getStore(req);
   const userId = getUserIdFromReq(req);
   const { id } = req.params;
-  projects = projects.filter((p) => !(p.id === id && p.userId === userId));
-  tasks = tasks.filter((t) => !(t.projectId === id && t.userId === userId));
-  saveData();
+  store.projects = store.projects.filter((p) => !(p.id === id && p.userId === userId));
+  store.tasks = store.tasks.filter((t) => !(t.projectId === id && t.userId === userId));
 
   return res.json({ message: 'Project deleted successfully' });
 });
 
 // TASKS API
 apiRouter.get('/tasks', (req: Request, res: Response) => {
+  const store = getStore(req);
   const userId = getUserIdFromReq(req);
-  let result = tasks.filter((t) => t.userId === userId);
+  let result = store.tasks.filter((t) => t.userId === userId);
 
   const { status, priority, projectId, search, isOverdueOnly, isTodayOnly, sort } = req.query;
 
@@ -486,7 +505,7 @@ apiRouter.get('/tasks', (req: Request, res: Response) => {
   }
 
   const enriched = result.map((t) => {
-    const proj = projects.find((p) => p.id === t.projectId);
+    const proj = store.projects.find((p) => p.id === t.projectId);
     return {
       ...t,
       projectName: proj ? proj.name : 'Unassigned',
@@ -498,6 +517,7 @@ apiRouter.get('/tasks', (req: Request, res: Response) => {
 });
 
 apiRouter.post('/tasks', (req: Request, res: Response) => {
+  const store = getStore(req);
   const userId = getUserIdFromReq(req);
   if (!userId) return res.status(401).json({ message: 'Unauthorized' });
 
@@ -508,9 +528,9 @@ apiRouter.post('/tasks', (req: Request, res: Response) => {
   }
 
   // Find assigned project or fallback to user's first project or auto-create General Workspace
-  let targetProj = projects.find((p) => p.id === projectId && p.userId === userId);
+  let targetProj = store.projects.find((p) => p.id === projectId && p.userId === userId);
   if (!targetProj) {
-    targetProj = projects.find((p) => p.userId === userId);
+    targetProj = store.projects.find((p) => p.userId === userId);
   }
   if (!targetProj) {
     targetProj = {
@@ -524,7 +544,7 @@ apiRouter.post('/tasks', (req: Request, res: Response) => {
       updatedAt: new Date().toISOString(),
       userId,
     };
-    projects.unshift(targetProj);
+    store.projects.unshift(targetProj);
   }
 
   const newTask: TaskRecord = {
@@ -542,8 +562,7 @@ apiRouter.post('/tasks', (req: Request, res: Response) => {
     tags: tags || ['Task'],
   };
 
-  tasks.unshift(newTask);
-  saveData();
+  store.tasks.unshift(newTask);
 
   return res.status(201).json({
     ...newTask,
@@ -553,60 +572,61 @@ apiRouter.post('/tasks', (req: Request, res: Response) => {
 });
 
 apiRouter.put('/tasks/:id', (req: Request, res: Response) => {
+  const store = getStore(req);
   const userId = getUserIdFromReq(req);
   const { id } = req.params;
-  const index = tasks.findIndex((t) => t.id === id && t.userId === userId);
+  const index = store.tasks.findIndex((t) => t.id === id && t.userId === userId);
   if (index === -1) {
     return res.status(404).json({ message: 'Task not found' });
   }
 
-  tasks[index] = {
-    ...tasks[index],
+  store.tasks[index] = {
+    ...store.tasks[index],
     ...req.body,
     updatedAt: new Date().toISOString(),
   };
 
-  saveData();
 
-  const proj = projects.find((p) => p.id === tasks[index].projectId);
+  const proj = store.projects.find((p) => p.id === store.tasks[index].projectId);
   return res.json({
-    ...tasks[index],
+    ...store.tasks[index],
     projectName: proj ? proj.name : 'Unassigned',
     projectColor: proj ? proj.color : '#c9a84c',
   });
 });
 
 apiRouter.patch('/tasks/:id/status', (req: Request, res: Response) => {
+  const store = getStore(req);
   const userId = getUserIdFromReq(req);
   const { id } = req.params;
   const { status } = req.body;
-  const task = tasks.find((t) => t.id === id && t.userId === userId);
+  const task = store.tasks.find((t) => t.id === id && t.userId === userId);
   if (!task) {
     return res.status(404).json({ message: 'Task not found' });
   }
 
   task.status = status;
   task.updatedAt = new Date().toISOString();
-  saveData();
 
   return res.json(task);
 });
 
 apiRouter.delete('/tasks/:id', (req: Request, res: Response) => {
+  const store = getStore(req);
   const userId = getUserIdFromReq(req);
   const { id } = req.params;
-  tasks = tasks.filter((t) => !(t.id === id && t.userId === userId));
-  saveData();
+  store.tasks = store.tasks.filter((t) => !(t.id === id && t.userId === userId));
 
   return res.json({ message: 'Task deleted successfully' });
 });
 
 // USER PROFILE API
 apiRouter.put('/users/profile', (req: Request, res: Response) => {
+  const store = getStore(req);
   const userId = getUserIdFromReq(req);
   if (!userId) return res.status(401).json({ message: 'Unauthorized' });
 
-  const user = users.find((u) => u.id === userId);
+  const user = store.users.find((u) => u.id === userId);
   if (!user) return res.status(404).json({ message: 'User not found' });
 
   const { name, bio, jobTitle, avatar } = req.body;
@@ -615,12 +635,12 @@ apiRouter.put('/users/profile', (req: Request, res: Response) => {
   if (jobTitle) user.jobTitle = jobTitle;
   if (avatar) user.avatar = avatar;
 
-  saveData();
   return res.json(user);
 });
 
 // GEMINI AI INTEGRATION API
 apiRouter.post('/ai/breakdown', async (req: Request, res: Response) => {
+  const store = getStore(req);
   const { taskTitle, taskDescription } = req.body;
 
   if (!taskTitle) {
@@ -687,8 +707,9 @@ Description: "${taskDescription || 'No description provided'}"`;
 });
 
 apiRouter.post('/ai/daily-plan', async (req: Request, res: Response) => {
+  const store = getStore(req);
   const userId = getUserIdFromReq(req);
-  const activeTasks = tasks.filter((t) => t.userId === userId && t.status !== 'COMPLETED');
+  const activeTasks = store.tasks.filter((t) => t.userId === userId && t.status !== 'COMPLETED');
 
   if (!ai) {
     return res.json({
