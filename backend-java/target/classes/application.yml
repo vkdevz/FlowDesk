@@ -1,0 +1,26 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /
+
+spring:
+  application:
+    name: flowdesk-backend
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/flowdesk_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC}
+    username: ${SPRING_DATASOURCE_USERNAME:flowdesk_user}
+    password: ${SPRING_DATASOURCE_PASSWORD:FlowDeskSecure2026!}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.MySQLDialect
+
+flowdesk:
+  app:
+    jwtSecret: ${JWT_SECRET:FlowDeskProductionSuperSecretJWTKeyForSigningTokens2026SecureKeyWith256BitsOrMore}
+    jwtExpirationMs: 86400000 # 24 hours

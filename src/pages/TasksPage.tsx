@@ -42,6 +42,14 @@ export const TasksPage: React.FC = () => {
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
 
+  // Inline Workspace Creator State
+  const [showInlineWorkspaceCreator, setShowInlineWorkspaceCreator] = useState(false);
+  const [inlineProjectData, setInlineProjectData] = useState({
+    name: '',
+    category: 'Backend Architecture',
+    color: '#4f46e5',
+  });
+
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -53,6 +61,26 @@ export const TasksPage: React.FC = () => {
   });
 
   const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
+
+  const handleCreateInlineProject = async () => {
+    if (!inlineProjectData.name.trim()) return;
+    try {
+      const res = await apiClient.post<Project>('/projects', {
+        name: inlineProjectData.name.trim(),
+        description: 'Created inline from Task Modal',
+        category: inlineProjectData.category,
+        color: inlineProjectData.color,
+      });
+      if (res.data) {
+        setProjects((prev) => [res.data, ...prev]);
+        setFormData((prev) => ({ ...prev, projectId: res.data.id }));
+        setShowInlineWorkspaceCreator(false);
+        setInlineProjectData({ name: '', category: 'Backend Architecture', color: '#4f46e5' });
+      }
+    } catch (err) {
+      console.error('Error creating inline project', err);
+    }
+  };
 
   const fetchTasksAndProjects = async () => {
     setLoading(true);
@@ -78,77 +106,9 @@ export const TasksPage: React.FC = () => {
         setFormData((prev) => ({ ...prev, projectId: projectsRes.data[0].id }));
       }
     } catch (err) {
-      console.error('Error fetching tasks, using fallback tasks:', err);
-      const fallbackProjects: Project[] = [
-        {
-          id: 'proj_1',
-          name: 'Backend Microservices',
-          description: 'Spring Boot 3 REST controllers, JWT Security filters, and JPA Repository mappings.',
-          category: 'Backend Architecture',
-          color: '#3b82f6',
-          isArchived: false,
-          createdAt: new Date().toISOString(),
-        },
-        {
-          id: 'proj_2',
-          name: 'Database Engine',
-          description: 'PostgreSQL relational schemas, Flyway migrations, and database connection pooling.',
-          category: 'Database Design',
-          color: '#10b981',
-          isArchived: false,
-          createdAt: new Date().toISOString(),
-        },
-      ];
-      const fallbackTasks: Task[] = [
-        {
-          id: 'task_1',
-          title: 'Configure Spring Security JWT Filter Chain',
-          description: 'Implement JwtAuthenticationFilter and BCryptPasswordEncoder beans for stateless bearer tokens.',
-          priority: 'HIGH',
-          status: 'IN_PROGRESS',
-          deadline: '2026-08-08',
-          projectId: 'proj_1',
-          projectName: 'Backend Microservices',
-          projectColor: '#3b82f6',
-          subtasks: [
-            { id: 'st_1', title: 'Add jjwt-api dependency', completed: true },
-            { id: 'st_2', title: 'Implement SecurityFilterChain bean', completed: true },
-            { id: 'st_3', title: 'Add CORS configuration source', completed: false },
-          ],
-          tags: ['Security', 'JWT', 'Spring Boot 3'],
-          createdAt: new Date().toISOString(),
-        },
-        {
-          id: 'task_2',
-          title: 'Design PostgreSQL Database Schema for Workspaces',
-          description: 'Create JPA Entities with @OneToMany relationships and Flyway migrations.',
-          priority: 'HIGH',
-          status: 'COMPLETED',
-          deadline: '2026-08-05',
-          projectId: 'proj_2',
-          projectName: 'Database Engine',
-          projectColor: '#10b981',
-          subtasks: [],
-          tags: ['JPA', 'PostgreSQL', 'Hibernate'],
-          createdAt: new Date().toISOString(),
-        },
-        {
-          id: 'task_3',
-          title: 'Implement Gemini AI Subtask Auto-Generation Route',
-          description: 'Integrate Google Gen AI SDK for automated task breakdown and priority estimation.',
-          priority: 'MEDIUM',
-          status: 'TO_DO',
-          deadline: '2026-08-10',
-          projectId: 'proj_1',
-          projectName: 'Backend Microservices',
-          projectColor: '#3b82f6',
-          subtasks: [],
-          tags: ['Gemini AI', 'React', 'TypeScript'],
-          createdAt: new Date().toISOString(),
-        },
-      ];
-      setTasks(fallbackTasks);
-      setProjects(fallbackProjects);
+      console.error('Error fetching tasks:', err);
+      setTasks([]);
+      setProjects([]);
     } finally {
       setLoading(false);
     }
@@ -172,47 +132,47 @@ export const TasksPage: React.FC = () => {
     setIsModalOpen(true);
   };
 
-  const handleOpenEdit = (t: Task) => {
-    setEditingTask(t);
+  const handleOpenEdit = (task: Task) => {
+    setEditingTask(task);
     setFormData({
-      title: t.title,
-      description: t.description,
-      priority: t.priority,
-      status: t.status,
-      deadline: t.deadline,
-      projectId: t.projectId,
-      subtasks: t.subtasks || [],
+      title: task.title,
+      description: task.description,
+      priority: task.priority,
+      status: task.status,
+      deadline: task.deadline,
+      projectId: task.projectId,
+      subtasks: task.subtasks || [],
     });
     setIsModalOpen(true);
   };
 
-  // Gemini AI Task Breakdown Trigger
   const handleAiBreakdown = async () => {
-    if (!formData.title) return alert('Please enter a task title first.');
+    if (!formData.title.trim()) {
+      alert('Please enter a task title first to generate AI breakdown.');
+      return;
+    }
+
     setAiLoading(true);
     try {
-      const res = await apiClient.post('/ai/breakdown', {
-        taskTitle: formData.title,
-        taskDescription: formData.description,
+      const res = await apiClient.post<{ description: string; subtasks: string[] }>('/ai/planner/decompose', {
+        title: formData.title,
       });
 
-      const { prioritySuggestion, suggestedSubtasks, summary } = res.data;
+      if (res.data) {
+        const generatedSubtasks = (res.data.subtasks || []).map((st, idx) => ({
+          id: `sub-${Date.now()}-${idx}`,
+          title: st,
+          completed: false,
+        }));
 
-      setFormData((prev) => ({
-        ...prev,
-        description: prev.description ? `${prev.description}\n\n[AI Summary]: ${summary}` : `[AI Summary]: ${summary}`,
-        priority: prioritySuggestion || prev.priority,
-        subtasks: [
-          ...prev.subtasks,
-          ...(suggestedSubtasks || []).map((s: string, idx: number) => ({
-            id: `sub-${Date.now()}-${idx}`,
-            title: s,
-            completed: false,
-          })),
-        ],
-      }));
+        setFormData((prev) => ({
+          ...prev,
+          description: prev.description ? `${prev.description}\n\n${res.data.description}` : res.data.description,
+          subtasks: [...prev.subtasks, ...generatedSubtasks],
+        }));
+      }
     } catch (err) {
-      console.error('AI breakdown failed', err);
+      console.error('AI Breakdown error', err);
     } finally {
       setAiLoading(false);
     }
@@ -220,12 +180,14 @@ export const TasksPage: React.FC = () => {
 
   const handleAddSubtask = () => {
     if (!newSubtaskTitle.trim()) return;
+    const newSub = {
+      id: `sub-${Date.now()}`,
+      title: newSubtaskTitle.trim(),
+      completed: false,
+    };
     setFormData((prev) => ({
       ...prev,
-      subtasks: [
-        ...prev.subtasks,
-        { id: `sub-${Date.now()}`, title: newSubtaskTitle.trim(), completed: false },
-      ],
+      subtasks: [...prev.subtasks, newSub],
     }));
     setNewSubtaskTitle('');
   };
@@ -246,7 +208,7 @@ export const TasksPage: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.title.trim() || !formData.projectId) return;
+    if (!formData.title.trim()) return;
 
     try {
       if (editingTask) {
@@ -257,21 +219,24 @@ export const TasksPage: React.FC = () => {
       setIsModalOpen(false);
       fetchTasksAndProjects();
     } catch (err) {
-      console.error('Error saving task', err);
+      console.error('Submit task error', err);
     }
   };
 
-  const handleStatusChange = async (id: string, newStatus: Status) => {
+  const handleToggleTaskStatus = async (task: Task) => {
+    const nextStatus: Status =
+      task.status === 'TO_DO' ? 'IN_PROGRESS' : task.status === 'IN_PROGRESS' ? 'COMPLETED' : 'TO_DO';
+
     try {
-      await apiClient.patch(`/tasks/${id}/status`, { status: newStatus });
+      await apiClient.patch(`/tasks/${task.id}/status`, { status: nextStatus });
       fetchTasksAndProjects();
     } catch (err) {
-      console.error('Status patch error', err);
+      console.error('Status toggle error', err);
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this task?')) return;
+  const handleDeleteTask = async (id: string) => {
+    if (!window.confirm('Delete this task permanently?')) return;
     try {
       await apiClient.delete(`/tasks/${id}`);
       fetchTasksAndProjects();
@@ -281,44 +246,44 @@ export const TasksPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 font-sans">
       {/* Header & Controls */}
-      <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-4">
+      <div className="bg-white border border-slate-200 p-6 rounded-2xl space-y-4 shadow-xs">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-xl font-bold text-slate-100 flex items-center gap-2">
-              <CheckSquare className="w-5 h-5 text-indigo-400" />
+            <h1 className="text-card-title md:text-section-title font-jakarta font-bold text-slate-900 flex items-center gap-2">
+              <CheckSquare className="w-6 h-6 text-indigo-600" />
               Task & Kanban Workspace
             </h1>
-            <p className="text-xs text-slate-400">
-              Filter, search, sort, and manage tasks mapped to Spring Data JPA repositories
+            <p className="text-body text-slate-600 mt-0.5">
+              Manage tasks mapped to Java Spring Data JPA entities with real-time status updates
             </p>
           </div>
 
           <div className="flex items-center gap-3">
             {/* View switcher */}
-            <div className="bg-slate-950 p-1 rounded-xl border border-slate-800 flex text-xs">
+            <div className="bg-slate-100 p-1 rounded-xl border border-slate-200 flex text-label">
               <button
                 onClick={() => setViewMode('table')}
-                className={`px-3 py-1.5 rounded-lg font-semibold transition-all ${
-                  viewMode === 'table' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-slate-200'
+                className={`px-3 py-1.5 rounded-lg font-semibold transition-all cursor-pointer ${
+                  viewMode === 'table' ? 'bg-white text-indigo-600 shadow-xs' : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
                 Table View
               </button>
               <button
                 onClick={() => setViewMode('kanban')}
-                className={`px-3 py-1.5 rounded-lg font-semibold transition-all ${
-                  viewMode === 'kanban' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-slate-200'
+                className={`px-3 py-1.5 rounded-lg font-semibold transition-all cursor-pointer ${
+                  viewMode === 'kanban' ? 'bg-white text-indigo-600 shadow-xs' : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
-                Kanban View
+                Kanban Board
               </button>
             </div>
 
             <button
               onClick={handleOpenCreate}
-              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold shadow-lg shadow-indigo-600/30 transition-all flex items-center gap-1.5"
+              className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-label font-semibold shadow-xs transition-all flex items-center gap-1.5 cursor-pointer font-sans"
             >
               <Plus className="w-4 h-4" /> New Task
             </button>
@@ -326,16 +291,16 @@ export const TasksPage: React.FC = () => {
         </div>
 
         {/* Filter Toolbar */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 pt-2 border-t border-slate-800">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 pt-2 border-t border-slate-100">
           {/* Search bar */}
           <div className="relative lg:col-span-2">
-            <Search className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by title or description..."
-              className="w-full pl-9 pr-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+              placeholder="Search title or description..."
+              className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-body text-slate-900 placeholder-slate-400 focus:outline-none focus:border-indigo-500 focus:bg-white"
             />
           </div>
 
@@ -343,7 +308,7 @@ export const TasksPage: React.FC = () => {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as any)}
-            className="px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-300 focus:outline-none focus:border-indigo-500"
+            className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-label text-slate-700 focus:outline-none focus:border-indigo-500 focus:bg-white"
           >
             <option value="ALL">All Statuses</option>
             <option value="TO_DO">To Do</option>
@@ -355,19 +320,19 @@ export const TasksPage: React.FC = () => {
           <select
             value={priorityFilter}
             onChange={(e) => setPriorityFilter(e.target.value as any)}
-            className="px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-300 focus:outline-none focus:border-indigo-500"
+            className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-label text-slate-700 focus:outline-none focus:border-indigo-500 focus:bg-white"
           >
             <option value="ALL">All Priorities</option>
-            <option value="HIGH">High Priority</option>
-            <option value="MEDIUM">Medium Priority</option>
-            <option value="LOW">Low Priority</option>
+            <option value="LOW">Low</option>
+            <option value="MEDIUM">Medium</option>
+            <option value="HIGH">High</option>
           </select>
 
-          {/* Project Filter */}
+          {/* Project Workspace Filter */}
           <select
             value={projectFilter}
             onChange={(e) => setProjectFilter(e.target.value)}
-            className="px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-300 focus:outline-none focus:border-indigo-500 truncate"
+            className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-label text-slate-700 focus:outline-none focus:border-indigo-500 focus:bg-white"
           >
             <option value="ALL">All Projects</option>
             {projects.map((p) => (
@@ -377,163 +342,151 @@ export const TasksPage: React.FC = () => {
             ))}
           </select>
 
-          {/* Sort Field */}
+          {/* Sort Order */}
           <select
             value={sortField}
             onChange={(e) => setSortField(e.target.value as SortField)}
-            className="px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-300 focus:outline-none focus:border-indigo-500"
+            className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-label text-slate-700 focus:outline-none focus:border-indigo-500 focus:bg-white"
           >
-            <option value="createdAt_desc">Sort: Newest</option>
-            <option value="createdAt_asc">Sort: Oldest</option>
-            <option value="priority_desc">Sort: High Priority</option>
-            <option value="deadline_asc">Sort: Earliest Deadline</option>
+            <option value="createdAt_desc font-mono">Newest First</option>
+            <option value="deadline_asc">Deadline (Soonest)</option>
+            <option value="priority_desc">Priority (High to Low)</option>
+            <option value="title_asc">Title (A-Z)</option>
           </select>
         </div>
 
-        {/* Quick Toggles */}
-        <div className="flex flex-wrap items-center gap-4 text-xs pt-1">
-          <label className="flex items-center gap-2 cursor-pointer text-slate-300">
+        {/* Toggle Shortcuts */}
+        <div className="flex items-center gap-4 text-label pt-1 text-slate-600">
+          <label className="flex items-center gap-1.5 cursor-pointer font-medium">
             <input
               type="checkbox"
               checked={isOverdueOnly}
               onChange={(e) => setIsOverdueOnly(e.target.checked)}
-              className="rounded border-slate-700 bg-slate-950 text-indigo-600 focus:ring-0"
+              className="rounded text-indigo-600 focus:ring-indigo-500"
             />
-            <span className={isOverdueOnly ? 'text-rose-400 font-bold' : ''}>Overdue Only</span>
+            <span className="text-rose-600 font-semibold">Overdue Only</span>
           </label>
-
-          <label className="flex items-center gap-2 cursor-pointer text-slate-300">
+          <label className="flex items-center gap-1.5 cursor-pointer font-medium">
             <input
               type="checkbox"
               checked={isTodayOnly}
               onChange={(e) => setIsTodayOnly(e.target.checked)}
-              className="rounded border-slate-700 bg-slate-950 text-indigo-600 focus:ring-0"
+              className="rounded text-indigo-600 focus:ring-indigo-500"
             />
-            <span className={isTodayOnly ? 'text-purple-400 font-bold' : ''}>Due Today</span>
+            <span className="text-indigo-600 font-semibold">Due Today</span>
           </label>
         </div>
       </div>
 
-      {/* Task Content */}
+      {/* Main View Area */}
       {loading ? (
-        <div className="flex flex-col items-center justify-center min-h-[40vh] text-slate-400 gap-2">
-          <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
-          <span className="text-xs">Executing JPA Task Queries...</span>
+        <div className="flex flex-col items-center justify-center min-h-[40vh] text-slate-400 gap-3">
+          <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
+          <span className="text-label font-medium uppercase tracking-wider text-slate-500 font-mono">Loading Tasks...</span>
         </div>
       ) : tasks.length === 0 ? (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-12 text-center space-y-3">
-          <ListTodo className="w-12 h-12 text-slate-600 mx-auto" />
-          <h3 className="text-sm font-bold text-slate-300">No Tasks Match Your Filters</h3>
-          <p className="text-xs text-slate-500 max-w-sm mx-auto">
-            Try resetting your search query or create a new task.
+        <div className="bg-white border border-slate-200 rounded-2xl p-12 text-center space-y-3 shadow-xs">
+          <ListTodo className="w-12 h-12 text-slate-300 mx-auto" />
+          <h3 className="text-card-title font-jakarta font-semibold text-slate-900">No tasks found</h3>
+          <p className="text-body text-slate-500 max-w-md mx-auto">
+            Try adjusting your search criteria or create a new task.
           </p>
           <button
             onClick={handleOpenCreate}
-            className="px-4 py-2 bg-indigo-600 text-white text-xs font-semibold rounded-xl"
+            className="mt-2 inline-flex items-center gap-1.5 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-label font-semibold shadow-xs cursor-pointer"
           >
-            Create Task
+            <Plus className="w-4 h-4" /> Create Task
           </button>
         </div>
       ) : viewMode === 'table' ? (
         /* TABLE VIEW */
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 overflow-x-auto shadow-md">
-          <table className="w-full text-left text-xs">
+        <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
+          <table className="w-full text-left text-body">
             <thead>
-              <tr className="text-slate-400 border-b border-slate-800 font-semibold uppercase tracking-wider">
-                <th className="pb-3 px-3">Status</th>
-                <th className="pb-3 px-3">Title & Description</th>
-                <th className="pb-3 px-3">Project</th>
-                <th className="pb-3 px-3">Priority</th>
-                <th className="pb-3 px-3">Deadline</th>
-                <th className="pb-3 px-3">Subtasks</th>
-                <th className="pb-3 px-3 text-right">Actions</th>
+              <tr className="bg-slate-50 border-b border-slate-200 text-label font-semibold text-slate-500 uppercase tracking-wider">
+                <th className="py-3.5 px-4">Task Name & Details</th>
+                <th className="py-3.5 px-4">Project</th>
+                <th className="py-3.5 px-4">Priority</th>
+                <th className="py-3.5 px-4">Status</th>
+                <th className="py-3.5 px-4">Subtasks</th>
+                <th className="py-3.5 px-4">Deadline</th>
+                <th className="py-3.5 px-4 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/60 text-slate-300 font-medium">
+            <tbody className="divide-y divide-slate-100 text-slate-700">
               {tasks.map((task) => {
-                const subCount = task.subtasks?.length || 0;
-                const subDone = task.subtasks?.filter((s) => s.completed).length || 0;
+                const totalSub = task.subtasks?.length || 0;
+                const completedSub = task.subtasks?.filter((s) => s.completed).length || 0;
 
                 return (
-                  <tr key={task.id} className="hover:bg-slate-800/40 transition-colors">
-                    <td className="py-3.5 px-3">
-                      <select
-                        value={task.status}
-                        onChange={(e) => handleStatusChange(task.id, e.target.value as Status)}
-                        className={`px-2 py-1 rounded text-[11px] font-bold focus:outline-none ${
-                          task.status === 'COMPLETED'
-                            ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                            : task.status === 'IN_PROGRESS'
-                            ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                            : 'bg-slate-800 text-slate-300 border border-slate-700'
-                        }`}
-                      >
-                        <option value="TO_DO">TO DO</option>
-                        <option value="IN_PROGRESS">IN PROGRESS</option>
-                        <option value="COMPLETED">COMPLETED</option>
-                      </select>
+                  <tr key={task.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="py-4 px-4 space-y-1">
+                      <div className="font-semibold text-slate-900 text-body">{task.title}</div>
+                      <p className="text-caption text-slate-500 line-clamp-1 max-w-md">{task.description}</p>
                     </td>
-
-                    <td className="py-3.5 px-3 max-w-xs">
-                      <div className="font-bold text-slate-100">{task.title}</div>
-                      <p className="text-[11px] text-slate-400 truncate mt-0.5">{task.description}</p>
-                    </td>
-
-                    <td className="py-3.5 px-3">
+                    <td className="py-4 px-4">
                       <span
-                        className="px-2.5 py-0.5 rounded text-[11px] font-bold"
+                        className="px-2.5 py-0.5 rounded text-data font-medium"
                         style={{
-                          backgroundColor: `${task.projectColor}20`,
-                          color: task.projectColor,
-                          border: `1px solid ${task.projectColor}40`,
+                          backgroundColor: `${task.projectColor || '#4f46e5'}15`,
+                          color: task.projectColor || '#4f46e5',
+                          border: `1px solid ${task.projectColor || '#4f46e5'}30`,
                         }}
                       >
                         {task.projectName}
                       </span>
                     </td>
-
-                    <td className="py-3.5 px-3">
+                    <td className="py-4 px-4">
                       <span
-                        className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                        className={`px-2.5 py-0.5 rounded text-caption font-semibold ${
                           task.priority === 'HIGH'
-                            ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                            ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
                             : task.priority === 'MEDIUM'
-                            ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                            : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                            ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                            : 'bg-slate-100 text-slate-600 border border-slate-200'
                         }`}
                       >
                         {task.priority}
                       </span>
                     </td>
-
-                    <td className="py-3.5 px-3 font-mono text-slate-400">
-                      <div className="flex items-center gap-1">
-                        <Calendar className="w-3.5 h-3.5" />
-                        {task.deadline}
-                      </div>
+                    <td className="py-4 px-4">
+                      <button
+                        onClick={() => handleToggleTaskStatus(task)}
+                        className={`px-2.5 py-1 rounded text-caption font-semibold transition-transform active:scale-95 cursor-pointer flex items-center gap-1.5 ${
+                          task.status === 'COMPLETED'
+                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                            : task.status === 'IN_PROGRESS'
+                            ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                            : 'bg-slate-100 text-slate-600 border border-slate-200'
+                        }`}
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        {task.status.replace('_', ' ')}
+                      </button>
                     </td>
-
-                    <td className="py-3.5 px-3 text-slate-400 font-mono text-[11px]">
-                      {subCount > 0 ? (
-                        <span className="text-slate-300">
-                          {subDone}/{subCount} Done
+                    <td className="py-4 px-4 font-mono text-caption text-slate-500">
+                      {totalSub > 0 ? (
+                        <span>
+                          {completedSub}/{totalSub} Done
                         </span>
                       ) : (
-                        <span className="text-slate-600">—</span>
+                        <span className="text-slate-400">—</span>
                       )}
                     </td>
-
-                    <td className="py-3.5 px-3 text-right">
+                    <td className="py-4 px-4 font-mono text-data text-slate-600">{task.deadline}</td>
+                    <td className="py-4 px-4 text-right">
                       <div className="flex items-center justify-end gap-1">
                         <button
                           onClick={() => handleOpenEdit(task)}
-                          className="p-1.5 text-slate-400 hover:text-indigo-400 hover:bg-slate-800 rounded-lg transition-colors"
+                          className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-slate-100 rounded-lg cursor-pointer"
+                          title="Edit Task"
                         >
                           <Edit3 className="w-4 h-4" />
                         </button>
                         <button
-                          onClick={() => handleDelete(task.id)}
-                          className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
+                          onClick={() => handleDeleteTask(task.id)}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg cursor-pointer"
+                          title="Delete Task"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -553,22 +506,22 @@ export const TasksPage: React.FC = () => {
             return (
               <div
                 key={colStatus}
-                className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3 min-h-[60vh] flex flex-col"
+                className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-3 min-h-[60vh] flex flex-col shadow-xs"
               >
-                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                  <h3 className="font-bold text-xs uppercase tracking-wider text-slate-300 flex items-center gap-2">
+                <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+                  <h3 className="font-semibold text-label uppercase tracking-wider text-slate-700 flex items-center gap-2 font-jakarta">
                     <span
-                      className={`w-2 h-2 rounded-full ${
+                      className={`w-2.5 h-2.5 rounded-full ${
                         colStatus === 'COMPLETED'
                           ? 'bg-emerald-500'
                           : colStatus === 'IN_PROGRESS'
                           ? 'bg-amber-500'
-                          : 'bg-blue-500'
+                          : 'bg-slate-400'
                       }`}
                     ></span>
                     {colStatus.replace('_', ' ')}
                   </h3>
-                  <span className="px-2 py-0.5 rounded-full bg-slate-950 text-slate-400 font-mono text-[10px] font-bold border border-slate-800">
+                  <span className="px-2 py-0.5 rounded-full bg-white text-indigo-600 font-mono text-data font-semibold border border-slate-200">
                     {colTasks.length}
                   </span>
                 </div>
@@ -577,14 +530,14 @@ export const TasksPage: React.FC = () => {
                   {colTasks.map((task) => (
                     <div
                       key={task.id}
-                      className="bg-slate-950 border border-slate-800/80 hover:border-slate-700 p-4 rounded-xl space-y-3 shadow-sm transition-all"
+                      className="bg-white border border-slate-200 hover:border-slate-300 p-4 rounded-xl space-y-3 shadow-xs hover:shadow-md transition-all"
                     >
                       <div className="flex items-center justify-between">
                         <span
-                          className="px-2 py-0.5 rounded text-[10px] font-bold"
+                          className="px-2 py-0.5 rounded text-data font-medium"
                           style={{
-                            backgroundColor: `${task.projectColor}20`,
-                            color: task.projectColor,
+                            backgroundColor: `${task.projectColor || '#4f46e5'}15`,
+                            color: task.projectColor || '#4f46e5',
                           }}
                         >
                           {task.projectName}
@@ -593,7 +546,7 @@ export const TasksPage: React.FC = () => {
                         <div className="flex items-center gap-1">
                           <button
                             onClick={() => handleOpenEdit(task)}
-                            className="text-slate-500 hover:text-slate-300 p-1"
+                            className="text-slate-400 hover:text-indigo-600 p-1 cursor-pointer"
                           >
                             <Edit3 className="w-3.5 h-3.5" />
                           </button>
@@ -601,25 +554,25 @@ export const TasksPage: React.FC = () => {
                       </div>
 
                       <div>
-                        <h4 className="text-xs font-bold text-slate-100">{task.title}</h4>
-                        <p className="text-[11px] text-slate-400 line-clamp-2 mt-1">{task.description}</p>
+                        <h4 className="text-body font-semibold text-slate-900">{task.title}</h4>
+                        <p className="text-caption text-slate-500 line-clamp-2 mt-1">{task.description}</p>
                       </div>
 
-                      <div className="flex items-center justify-between pt-2 border-t border-slate-800/60 text-[10px]">
+                      <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-caption">
                         <span
-                          className={`px-1.5 py-0.5 rounded font-bold ${
+                          className={`px-1.5 py-0.5 rounded font-semibold ${
                             task.priority === 'HIGH'
-                              ? 'bg-rose-500/20 text-rose-400'
+                              ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
                               : task.priority === 'MEDIUM'
-                              ? 'bg-amber-500/20 text-amber-400'
-                              : 'bg-emerald-500/20 text-emerald-400'
+                              ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                              : 'bg-slate-100 text-slate-600'
                           }`}
                         >
                           {task.priority}
                         </span>
 
-                        <span className="font-mono text-slate-400 flex items-center gap-1">
-                          <Clock className="w-3 h-3" /> {task.deadline}
+                        <span className="font-mono text-data text-slate-500 flex items-center gap-1">
+                          <Clock className="w-3 h-3 text-indigo-600" /> {task.deadline}
                         </span>
                       </div>
                     </div>
@@ -633,16 +586,16 @@ export const TasksPage: React.FC = () => {
 
       {/* Create / Edit Task Modal with Gemini AI Assistant */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="bg-slate-900 border border-slate-700/80 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl text-slate-100">
-            <div className="px-6 py-4 bg-slate-950 border-b border-slate-800 flex items-center justify-between">
-              <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
-                {editingTask ? 'Edit Task' : 'Create New Task'}
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-mono">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4">
+          <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-xl text-slate-900">
+            <div className="px-6 py-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+              <h3 className="text-card-title font-jakarta font-semibold text-slate-900 flex items-center gap-2">
+                {editingTask ? 'Edit Task Specification' : 'Create New Task'}
+                <span className="text-data font-semibold px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 font-mono">
                   Gemini AI Powered
                 </span>
               </h3>
-              <button onClick={() => setIsModalOpen(false)} className="p-1 text-slate-400 hover:text-slate-200">
+              <button onClick={() => setIsModalOpen(false)} className="p-1 text-slate-400 hover:text-slate-600 cursor-pointer">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -651,17 +604,17 @@ export const TasksPage: React.FC = () => {
               {/* Task Title with AI Breakdown Button */}
               <div className="space-y-1">
                 <div className="flex items-center justify-between">
-                  <label className="text-xs font-semibold text-slate-300">Task Title *</label>
+                  <label className="text-label font-medium text-slate-700">Task Title *</label>
                   <button
                     type="button"
                     onClick={handleAiBreakdown}
                     disabled={aiLoading}
-                    className="text-[11px] font-bold text-indigo-400 hover:text-indigo-300 flex items-center gap-1"
+                    className="text-label font-semibold text-indigo-600 hover:text-indigo-700 flex items-center gap-1 cursor-pointer"
                   >
                     {aiLoading ? (
-                      <Loader2 className="w-3 h-3 animate-spin text-indigo-400" />
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-600" />
                     ) : (
-                      <Sparkles className="w-3 h-3 text-amber-400" />
+                      <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
                     )}
                     Gemini AI Breakdown
                   </button>
@@ -672,124 +625,199 @@ export const TasksPage: React.FC = () => {
                   value={formData.title}
                   onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                   placeholder="e.g. Implement JwtUtils service in Spring Security"
-                  className="w-full px-3.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-100 focus:border-indigo-500 focus:outline-none"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-body text-slate-900 focus:border-indigo-500 focus:bg-white focus:outline-none"
                 />
               </div>
 
-              {/* Project & Priority */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-300">Project Workspace *</label>
-                  <select
-                    required
-                    value={formData.projectId}
-                    onChange={(e) => setFormData({ ...formData, projectId: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-100 focus:border-indigo-500 focus:outline-none"
+              {/* Project Workspace Selection & Inline Creator */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-label font-medium text-slate-700">Project Workspace *</label>
+                  <button
+                    type="button"
+                    onClick={() => setShowInlineWorkspaceCreator(!showInlineWorkspaceCreator)}
+                    className="text-label font-semibold text-indigo-600 hover:text-indigo-700 flex items-center gap-1 cursor-pointer"
                   >
-                    {projects.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name}
-                      </option>
-                    ))}
-                  </select>
+                    <Plus className="w-3.5 h-3.5 text-indigo-600" />
+                    {showInlineWorkspaceCreator ? 'Cancel Creator' : '+ Quick Add Workspace'}
+                  </button>
                 </div>
 
+                {showInlineWorkspaceCreator ? (
+                  <div className="p-3 bg-slate-50 border border-indigo-200 rounded-xl space-y-2.5">
+                    <div className="text-label font-semibold text-indigo-700 font-jakarta flex items-center gap-1.5">
+                      <CheckSquare className="w-3.5 h-3.5" /> Create Workspace Inline
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <input
+                        type="text"
+                        value={inlineProjectData.name}
+                        onChange={(e) => setInlineProjectData({ ...inlineProjectData, name: e.target.value })}
+                        placeholder="Workspace Name (e.g. Auth Microservice)"
+                        className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-body text-slate-900 focus:outline-none focus:border-indigo-500"
+                      />
+                      <select
+                        value={inlineProjectData.category}
+                        onChange={(e) => setInlineProjectData({ ...inlineProjectData, category: e.target.value })}
+                        className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-body text-slate-900 focus:outline-none focus:border-indigo-500 font-mono"
+                      >
+                        <option value="Backend Architecture">Backend Architecture</option>
+                        <option value="Frontend Engineering">Frontend Engineering</option>
+                        <option value="DevOps & Infra">DevOps & Infra</option>
+                        <option value="Database Design">Database Design</option>
+                        <option value="General">General</option>
+                      </select>
+                    </div>
+                    <div className="flex items-center justify-between pt-1">
+                      <div className="flex items-center gap-2">
+                        {['#4f46e5', '#10b981', '#f59e0b', '#2563eb', '#7c3aed'].map((c) => (
+                          <button
+                            key={c}
+                            type="button"
+                            onClick={() => setInlineProjectData({ ...inlineProjectData, color: c })}
+                            className={`w-4 h-4 rounded-full transition-transform cursor-pointer ${
+                              inlineProjectData.color === c ? 'scale-125 ring-2 ring-indigo-600 ring-offset-1' : ''
+                            }`}
+                            style={{ backgroundColor: c }}
+                          />
+                        ))}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleCreateInlineProject}
+                        className="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white text-label font-semibold rounded-lg cursor-pointer"
+                      >
+                        Save Workspace
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {projects.length === 0 ? (
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, projectId: '' })}
+                        className="p-2 rounded-xl border border-indigo-300 bg-indigo-50 text-indigo-700 text-left text-body font-semibold flex items-center justify-between"
+                      >
+                        <span className="truncate">General Workspace</span>
+                        <CheckCircle2 className="w-3.5 h-3.5 text-indigo-600" />
+                      </button>
+                    ) : (
+                      projects.map((p) => {
+                        const isSelected = formData.projectId === p.id;
+                        return (
+                          <button
+                            key={p.id}
+                            type="button"
+                            onClick={() => setFormData({ ...formData, projectId: p.id })}
+                            className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex items-center justify-between ${
+                              isSelected
+                                ? 'bg-indigo-50 border-indigo-300 text-indigo-700 font-semibold shadow-xs'
+                                : 'bg-white border-slate-200 hover:border-slate-300 text-slate-700'
+                            }`}
+                          >
+                            <div className="flex items-center gap-1.5 truncate">
+                              <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: p.color || '#4f46e5' }} />
+                              <span className="text-body truncate">{p.name}</span>
+                            </div>
+                            {isSelected && <CheckCircle2 className="w-3.5 h-3.5 text-indigo-600 flex-shrink-0 ml-1" />}
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Priority & Status */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-300">Priority Level *</label>
+                  <label className="text-label font-medium text-slate-700">Priority Level *</label>
                   <select
                     value={formData.priority}
                     onChange={(e) => setFormData({ ...formData, priority: e.target.value as Priority })}
-                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-100 focus:border-indigo-500 focus:outline-none"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-body text-slate-900 focus:border-indigo-500 focus:bg-white focus:outline-none"
                   >
                     <option value="LOW">LOW</option>
                     <option value="MEDIUM">MEDIUM</option>
                     <option value="HIGH">HIGH</option>
                   </select>
                 </div>
-              </div>
 
-              {/* Status & Deadline */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-300">Status</label>
+                  <label className="text-label font-medium text-slate-700">Status</label>
                   <select
                     value={formData.status}
                     onChange={(e) => setFormData({ ...formData, status: e.target.value as Status })}
-                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-100 focus:border-indigo-500 focus:outline-none"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-body text-slate-900 focus:border-indigo-500 focus:bg-white focus:outline-none"
                   >
-                    <option value="TO_DO">TO DO</option>
-                    <option value="IN_PROGRESS">IN PROGRESS</option>
-                    <option value="COMPLETED">COMPLETED</option>
+                    <option value="TO_DO">To Do</option>
+                    <option value="IN_PROGRESS">In Progress</option>
+                    <option value="COMPLETED">Completed</option>
                   </select>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-300">Deadline *</label>
-                  <input
-                    type="date"
-                    required
-                    value={formData.deadline}
-                    onChange={(e) => setFormData({ ...formData, deadline: e.target.value })}
-                    className="w-full px-3.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-100 focus:border-indigo-500 focus:outline-none"
-                  />
                 </div>
               </div>
 
-              {/* Description */}
+              {/* Deadline */}
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-300">Description</label>
+                <label className="text-label font-medium text-slate-700">Completion Deadline</label>
+                <input
+                  type="date"
+                  value={formData.deadline}
+                  onChange={(e) => setFormData({ ...formData, deadline: e.target.value })}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-body text-slate-900 focus:border-indigo-500 focus:bg-white focus:outline-none font-mono"
+                />
+              </div>
+
+              {/* Task Description */}
+              <div className="space-y-1">
+                <label className="text-label font-medium text-slate-700">Description & Acceptance Criteria</label>
                 <textarea
                   rows={3}
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="Task specifications, technical acceptance criteria..."
-                  className="w-full px-3.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-100 focus:border-indigo-500 focus:outline-none"
+                  placeholder="Detail engineering requirements, JWT filter logic, endpoints..."
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-body text-slate-900 placeholder-slate-400 focus:border-indigo-500 focus:bg-white focus:outline-none"
                 />
               </div>
 
-              {/* Subtasks Checklist Section */}
-              <div className="space-y-2 pt-2 border-t border-slate-800">
-                <label className="text-xs font-semibold text-slate-300">Subtasks Checklist</label>
-
+              {/* Subtasks Checklist */}
+              <div className="space-y-2 pt-2 border-t border-slate-100">
+                <label className="text-label font-medium text-slate-700">Subtask Breakdown Checklist</label>
                 <div className="flex gap-2">
                   <input
                     type="text"
                     value={newSubtaskTitle}
                     onChange={(e) => setNewSubtaskTitle(e.target.value)}
-                    placeholder="Add step or subtask..."
-                    className="flex-1 px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-xs text-slate-100 focus:outline-none"
+                    placeholder="Add subtask step (e.g. Implement BCryptPasswordEncoder)"
+                    className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-body text-slate-900 focus:border-indigo-500 focus:bg-white focus:outline-none"
                   />
                   <button
                     type="button"
                     onClick={handleAddSubtask}
-                    className="px-3 py-1.5 bg-slate-800 text-slate-200 rounded-lg text-xs font-semibold"
+                    className="px-3.5 py-2 bg-indigo-600 text-white rounded-xl text-label font-semibold hover:bg-indigo-700 cursor-pointer"
                   >
                     Add
                   </button>
                 </div>
 
                 {formData.subtasks.length > 0 && (
-                  <div className="space-y-1 mt-2">
+                  <div className="space-y-1.5 max-h-36 overflow-y-auto pt-1">
                     {formData.subtasks.map((st) => (
-                      <div
-                        key={st.id}
-                        className="flex items-center justify-between p-2 bg-slate-950 border border-slate-800 rounded-lg text-xs"
-                      >
+                      <div key={st.id} className="flex items-center justify-between p-2 bg-slate-50 border border-slate-200 rounded-lg text-body">
                         <label className="flex items-center gap-2 cursor-pointer">
                           <input
                             type="checkbox"
                             checked={st.completed}
                             onChange={() => handleToggleSubtask(st.id)}
-                            className="rounded border-slate-700 bg-slate-900 text-indigo-600 focus:ring-0"
+                            className="rounded text-indigo-600 focus:ring-indigo-500"
                           />
-                          <span className={st.completed ? 'line-through text-slate-500' : 'text-slate-200'}>
-                            {st.title}
-                          </span>
+                          <span className={st.completed ? 'line-through text-slate-400' : 'text-slate-700'}>{st.title}</span>
                         </label>
                         <button
                           type="button"
                           onClick={() => handleRemoveSubtask(st.id)}
-                          className="text-slate-500 hover:text-rose-400 p-1"
+                          className="text-slate-400 hover:text-rose-600 p-1 cursor-pointer"
                         >
                           <X className="w-3.5 h-3.5" />
                         </button>
@@ -799,19 +827,20 @@ export const TasksPage: React.FC = () => {
                 )}
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
+              {/* Submit Buttons */}
+              <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl text-xs font-semibold"
+                  className="px-4 py-2 text-label font-medium text-slate-600 hover:text-slate-900 cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold shadow-md"
+                  className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-label font-semibold shadow-xs cursor-pointer font-sans"
                 >
-                  {editingTask ? 'Save Task' : 'Create Task'}
+                  {editingTask ? 'Update Task' : 'Create Task'}
                 </button>
               </div>
             </form>

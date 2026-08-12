@@ -1,0 +1,15 @@
+[
+  {
+    "id": "usr-1786216095244",
+    "name": "test",
+    "email": "test@mail.com",
+    "passwordHash": "test@123",
+    "avatar": "https://api.dicebear.com/7.x/avataaars/svg?seed=test",
+    "roles": [
+      "ROLE_USER"
+    ],
+    "bio": "Productivity enthusiast.",
+    "jobTitle": "Software Engineer",
+    "createdAt": "2026-08-08T19:08:15.244Z"
+  }
+]

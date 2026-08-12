@@ -23,8 +23,8 @@ export interface Project {
   color: string;
   isArchived: boolean;
   createdAt: string;
-  updatedAt: string;
-  userId: string;
+  updatedAt?: string;
+  userId?: string;
   taskCount?: number;
   completedTaskCount?: number;
 }
@@ -43,11 +43,11 @@ export interface Task {
   status: Status;
   deadline: string; // ISO date string YYYY-MM-DD
   createdAt: string;
-  updatedAt: string;
+  updatedAt?: string;
   projectId: string;
   projectName?: string;
   projectColor?: string;
-  userId: string;
+  userId?: string;
   subtasks?: Subtask[];
   tags?: string[];
 }

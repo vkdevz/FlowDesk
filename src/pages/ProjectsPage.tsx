@@ -25,7 +25,7 @@ export const ProjectsPage: React.FC = () => {
     name: '',
     description: '',
     category: 'Backend Architecture',
-    color: '#3b82f6',
+    color: '#4f46e5',
   });
 
   const categories = [
@@ -38,48 +38,12 @@ export const ProjectsPage: React.FC = () => {
   ];
 
   const colorOptions = [
-    '#3b82f6', // blue
-    '#10b981', // emerald
-    '#8b5cf6', // purple
-    '#f59e0b', // amber
-    '#ef4444', // red
-    '#ec4899', // pink
-  ];
-
-  const FALLBACK_PROJECTS: Project[] = [
-    {
-      id: 'proj_1',
-      name: 'Backend Microservices',
-      description: 'Spring Boot 3 REST controllers, JWT Security filters, and JPA Repository mappings.',
-      category: 'Backend Architecture',
-      color: '#3b82f6',
-      isArchived: false,
-      taskCount: 3,
-      completedTaskCount: 1,
-      createdAt: new Date().toISOString(),
-    },
-    {
-      id: 'proj_2',
-      name: 'Database Engine',
-      description: 'PostgreSQL relational schemas, Flyway migrations, and database connection pooling.',
-      category: 'Database Design',
-      color: '#10b981',
-      isArchived: false,
-      taskCount: 2,
-      completedTaskCount: 1,
-      createdAt: new Date().toISOString(),
-    },
-    {
-      id: 'proj_3',
-      name: 'Frontend Platform',
-      description: 'React 18, Vite, Tailwind CSS, Recharts analytics, and Gemini AI assistant modal integrations.',
-      category: 'Frontend Engineering',
-      color: '#8b5cf6',
-      isArchived: false,
-      taskCount: 1,
-      completedTaskCount: 0,
-      createdAt: new Date().toISOString(),
-    },
+    '#4f46e5', // Primary Indigo
+    '#10b981', // Emerald Green
+    '#f59e0b', // Amber Gold
+    '#2563eb', // Royal Blue
+    '#7c3aed', // Purple Violet
+    '#059669', // Forest Green
   ];
 
   const fetchProjects = async () => {
@@ -88,8 +52,8 @@ export const ProjectsPage: React.FC = () => {
       const res = await apiClient.get<Project[]>(`/projects?archived=${showArchived}`);
       setProjects(res.data);
     } catch (err) {
-      console.error('Failed to load projects, using fallback data:', err);
-      setProjects(FALLBACK_PROJECTS.filter((p) => (showArchived ? p.isArchived : !p.isArchived)));
+      console.error('Failed to load projects:', err);
+      setProjects([]);
     } finally {
       setLoading(false);
     }
@@ -105,7 +69,7 @@ export const ProjectsPage: React.FC = () => {
       name: '',
       description: '',
       category: 'Backend Architecture',
-      color: '#3b82f6',
+      color: '#4f46e5',
     });
     setIsModalOpen(true);
   };
@@ -138,17 +102,17 @@ export const ProjectsPage: React.FC = () => {
     }
   };
 
-  const handleToggleArchive = async (proj: Project) => {
+  const handleToggleArchive = async (id: string) => {
     try {
-      await apiClient.patch(`/projects/${proj.id}/archive`);
+      await apiClient.patch(`/projects/${id}/archive`);
       fetchProjects();
     } catch (err) {
-      console.error('Error toggling archive', err);
+      console.error('Error archiving project', err);
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this project and all its tasks?')) return;
+    if (!window.confirm('Are you sure you want to delete this project and all its tasks?')) return;
     try {
       await apiClient.delete(`/projects/${id}`);
       fetchProjects();
@@ -158,114 +122,109 @@ export const ProjectsPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900 border border-slate-800 p-6 rounded-2xl">
-        <div className="space-y-1">
-          <h1 className="text-xl font-bold text-slate-100 flex items-center gap-2">
-            <FolderKanban className="w-5 h-5 text-indigo-400" />
-            Project Management Workspaces
+    <div className="space-y-6 font-sans">
+      {/* Header Bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white border border-slate-200 p-6 rounded-2xl shadow-xs">
+        <div>
+          <h1 className="text-card-title md:text-section-title font-jakarta font-bold text-slate-900 flex items-center gap-2">
+            <FolderKanban className="w-6 h-6 text-indigo-600" /> Project Workspaces
           </h1>
-          <p className="text-xs text-slate-400">
-            Organize tasks into JPA-relational Project Entities with categorized color tags
+          <p className="text-body text-slate-600 mt-1">
+            Organize tasks into categorized project modules mapped to Java Spring Boot repositories.
           </p>
         </div>
-
         <div className="flex items-center gap-3">
           <button
             onClick={() => setShowArchived(!showArchived)}
-            className={`px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all flex items-center gap-1.5 ${
+            className={`px-3.5 py-2 rounded-xl text-label transition-all flex items-center gap-1.5 cursor-pointer font-medium ${
               showArchived
-                ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
-                : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
+                ? 'bg-indigo-50 text-indigo-700 border border-indigo-200 font-semibold'
+                : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
             }`}
           >
-            <Archive className="w-4 h-4" />
+            <Archive className="w-3.5 h-3.5" />
             {showArchived ? 'Showing Archived' : 'Show Archived'}
           </button>
-
           <button
             onClick={handleOpenCreateModal}
-            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold shadow-lg shadow-indigo-600/30 transition-all flex items-center gap-1.5"
+            className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-label font-semibold shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
           >
-            <Plus className="w-4 h-4" />
-            Create Project
+            <Plus className="w-4 h-4" /> New Project
           </button>
         </div>
       </div>
 
       {/* Projects Grid */}
       {loading ? (
-        <div className="flex flex-col items-center justify-center min-h-[40vh] text-slate-400 gap-2">
-          <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
-          <span className="text-xs">Fetching Spring Boot Projects...</span>
+        <div className="flex flex-col items-center justify-center min-h-[40vh] text-slate-400 gap-3">
+          <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
+          <span className="text-label font-medium uppercase tracking-wider text-slate-500 font-mono">Loading Projects...</span>
         </div>
       ) : projects.length === 0 ? (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-12 text-center space-y-3">
-          <Layers className="w-12 h-12 text-slate-600 mx-auto" />
-          <h3 className="text-sm font-bold text-slate-300">No Projects Found</h3>
-          <p className="text-xs text-slate-500 max-w-sm mx-auto">
+        <div className="bg-white border border-slate-200 rounded-2xl p-12 text-center space-y-3 shadow-xs">
+          <FolderKanban className="w-12 h-12 text-slate-300 mx-auto" />
+          <h3 className="text-card-title font-jakarta font-semibold text-slate-900">No projects found</h3>
+          <p className="text-body text-slate-500 max-w-md mx-auto">
             {showArchived
-              ? 'No archived projects in database.'
-              : 'Create your first project workspace to start organizing Spring Boot tasks.'}
+              ? 'No archived projects exist.'
+              : 'Create your first project workspace to organize your tasks & milestones.'}
           </p>
           {!showArchived && (
             <button
               onClick={handleOpenCreateModal}
-              className="px-4 py-2 bg-indigo-600 text-white text-xs font-semibold rounded-xl"
+              className="mt-2 inline-flex items-center gap-1.5 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-label font-semibold shadow-xs cursor-pointer"
             >
-              Create First Project
+              <Plus className="w-4 h-4" /> Create Project
             </button>
           )}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {projects.map((project) => {
-            const total = project.taskCount || 0;
-            const completed = project.completedTaskCount || 0;
-            const progress = total > 0 ? Math.round((completed / total) * 100) : 0;
+          {projects.map((proj) => {
+            const taskCount = proj.taskCount ?? 0;
+            const completedTaskCount = proj.completedTaskCount ?? 0;
+            const progress = taskCount > 0 ? Math.round((completedTaskCount / taskCount) * 100) : 0;
 
             return (
               <div
-                key={project.id}
-                className="bg-slate-900 border border-slate-800 hover:border-slate-700/80 rounded-2xl p-5 space-y-4 shadow-md transition-all flex flex-col justify-between"
+                key={proj.id}
+                className="bg-white border border-slate-200 hover:border-slate-300 rounded-2xl p-5 space-y-4 shadow-xs hover:shadow-md transition-all flex flex-col justify-between"
               >
                 <div className="space-y-3">
-                  {/* Top category badge & color dot */}
-                  <div className="flex items-center justify-between">
-                    <span
-                      className="px-2.5 py-1 rounded-md text-[10px] font-bold tracking-wider uppercase"
-                      style={{
-                        backgroundColor: `${project.color}20`,
-                        color: project.color,
-                        border: `1px solid ${project.color}40`,
-                      }}
-                    >
-                      {project.category}
-                    </span>
-
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="space-y-1">
+                      <span
+                        className="px-2.5 py-0.5 rounded text-data font-medium"
+                        style={{
+                          backgroundColor: `${proj.color || '#4f46e5'}15`,
+                          color: proj.color || '#4f46e5',
+                          border: `1px solid ${proj.color || '#4f46e5'}30`,
+                        }}
+                      >
+                        {proj.category}
+                      </span>
+                      <h3 className="text-card-title font-jakarta font-semibold text-slate-900 leading-snug">
+                        {proj.name}
+                      </h3>
+                    </div>
                     <div className="flex items-center gap-1">
                       <button
-                        onClick={() => handleOpenEditModal(project)}
-                        className="p-1.5 text-slate-400 hover:text-indigo-400 hover:bg-slate-800 rounded-lg transition-colors"
+                        onClick={() => handleOpenEditModal(proj)}
+                        className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
                         title="Edit Project"
                       >
                         <Edit2 className="w-3.5 h-3.5" />
                       </button>
                       <button
-                        onClick={() => handleToggleArchive(project)}
-                        className={`p-1.5 rounded-lg transition-colors ${
-                          project.isArchived
-                            ? 'text-amber-400 hover:bg-amber-500/10'
-                            : 'text-slate-400 hover:text-amber-400 hover:bg-slate-800'
-                        }`}
-                        title={project.isArchived ? 'Unarchive Project' : 'Archive Project'}
+                        onClick={() => handleToggleArchive(proj.id)}
+                        className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                        title={proj.isArchived ? 'Unarchive' : 'Archive'}
                       >
                         <Archive className="w-3.5 h-3.5" />
                       </button>
                       <button
-                        onClick={() => handleDelete(project.id)}
-                        className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
+                        onClick={() => handleDelete(proj.id)}
+                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
                         title="Delete Project"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -273,32 +232,24 @@ export const ProjectsPage: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Title & description */}
-                  <div>
-                    <h3 className="text-base font-bold text-slate-100">{project.name}</h3>
-                    <p className="text-xs text-slate-400 line-clamp-2 mt-1 leading-relaxed">
-                      {project.description || 'No description provided.'}
-                    </p>
-                  </div>
+                  <p className="text-body text-slate-600 line-clamp-2 leading-relaxed">
+                    {proj.description || 'No description provided.'}
+                  </p>
                 </div>
 
-                {/* Progress bar & task counter */}
-                <div className="space-y-2 pt-3 border-t border-slate-800/80">
-                  <div className="flex items-center justify-between text-xs text-slate-400">
-                    <span className="flex items-center gap-1 text-slate-300 font-medium">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> {completed} / {total} Tasks Done
+                {/* Progress Bar & Stats */}
+                <div className="space-y-2 pt-3 border-t border-slate-100">
+                  <div className="flex items-center justify-between text-label text-slate-600 font-mono">
+                    <span>Task Completion</span>
+                    <span className="text-indigo-600 font-semibold">
+                      {completedTaskCount} / {taskCount} ({progress}%)
                     </span>
-                    <span className="font-mono font-bold text-slate-200">{progress}%</span>
                   </div>
-
-                  <div className="w-full bg-slate-950 h-2 rounded-full overflow-hidden border border-slate-800">
+                  <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden border border-slate-200">
                     <div
-                      className="h-full transition-all duration-500 rounded-full"
-                      style={{
-                        width: `${progress}%`,
-                        backgroundColor: project.color,
-                      }}
-                    ></div>
+                      className="h-full bg-indigo-600 transition-all duration-500 rounded-full"
+                      style={{ width: `${progress}%` }}
+                    />
                   </div>
                 </div>
               </div>
@@ -307,91 +258,92 @@ export const ProjectsPage: React.FC = () => {
         </div>
       )}
 
-      {/* Create / Edit Project Modal */}
+      {/* Project Create / Edit Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="bg-slate-900 border border-slate-700/80 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl text-slate-100">
-            <div className="px-6 py-4 bg-slate-950 border-b border-slate-800 flex items-center justify-between">
-              <h3 className="text-sm font-bold text-slate-100">
-                {editingProject ? 'Edit Project' : 'Create New Project'}
-              </h3>
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-md p-6 space-y-5 shadow-xl">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h2 className="text-card-title font-jakarta font-semibold text-slate-900 flex items-center gap-2">
+                <Layers className="w-4 h-4 text-indigo-600" />
+                {editingProject ? 'Edit Project Workspace' : 'Create Project Workspace'}
+              </h2>
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="p-1 text-slate-400 hover:text-slate-200"
+                className="text-slate-400 hover:text-slate-600 cursor-pointer"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-300">Project Name *</label>
+                <label className="text-label text-slate-700 font-medium">Project Name *</label>
                 <input
                   type="text"
                   required
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   placeholder="e.g. Spring Boot Microservices"
-                  className="w-full px-3.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-100 focus:border-indigo-500 focus:outline-none"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-body text-slate-900 placeholder-slate-400 focus:outline-none focus:border-indigo-500 focus:bg-white"
                 />
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-300">Category</label>
+                <label className="text-label text-slate-700 font-medium">Category Tag</label>
                 <select
                   value={formData.category}
                   onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-100 focus:border-indigo-500 focus:outline-none"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-body text-slate-900 focus:outline-none focus:border-indigo-500 focus:bg-white font-mono"
                 >
-                  {categories.map((cat) => (
-                    <option key={cat} value={cat}>
-                      {cat}
+                  {categories.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
                     </option>
                   ))}
                 </select>
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-300">Color Theme</label>
-                <div className="flex gap-3 pt-1">
-                  {colorOptions.map((hex) => (
+                <label className="text-label text-slate-700 font-medium">Theme Color</label>
+                <div className="flex items-center gap-3">
+                  {colorOptions.map((c) => (
                     <button
-                      key={hex}
+                      key={c}
                       type="button"
-                      onClick={() => setFormData({ ...formData, color: hex })}
-                      className={`w-7 h-7 rounded-full transition-transform ${
-                        formData.color === hex ? 'scale-125 ring-2 ring-white' : 'hover:scale-110'
+                      onClick={() => setFormData({ ...formData, color: c })}
+                      className={`w-7 h-7 rounded-full transition-transform cursor-pointer ${
+                        formData.color === c ? 'scale-125 ring-2 ring-indigo-600 ring-offset-2' : 'hover:scale-110'
                       }`}
-                      style={{ backgroundColor: hex }}
+                      style={{ backgroundColor: c }}
                     />
                   ))}
                 </div>
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-300">Description</label>
+                <label className="text-label text-slate-700 font-medium">Description</label>
                 <textarea
                   rows={3}
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="Summarize project scope and target deliverables..."
-                  className="w-full px-3.5 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs text-slate-100 focus:border-indigo-500 focus:outline-none"
+                  placeholder="Outline high-level deliverables and architecture scope..."
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-body text-slate-900 placeholder-slate-400 focus:outline-none focus:border-indigo-500 focus:bg-white"
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
+              <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl text-xs font-semibold"
+                  className="px-4 py-2 text-label font-medium text-slate-600 hover:text-slate-900 cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold shadow-md"
+                  className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-label font-semibold shadow-xs cursor-pointer font-sans"
                 >
-                  {editingProject ? 'Save Changes' : 'Create Project'}
+                  {editingProject ? 'Save Changes' : 'Create Workspace'}
                 </button>
               </div>
             </form>
