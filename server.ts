@@ -105,9 +105,9 @@ loadData();
 
 // Helper functions
 const generateJWT = (userId: string, email: string) => {
-  return `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI${Buffer.from(
-    JSON.stringify({ userId, email, exp: Date.now() + 86400000 })
-  ).toString('base64')}.FlowDeskSignatureKey2026`;
+  const payloadStr = JSON.stringify({ userId, email, exp: Date.now() + 86400000 });
+  const base64Payload = Buffer.from(payloadStr).toString('base64');
+  return `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.${base64Payload}.FlowDeskSignatureKey2026`;
 };
 
 const getUserIdFromReq = (req: Request): string | null => {

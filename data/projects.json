@@ -1,1 +1,13 @@
-[]
+[
+  {
+    "id": "proj-1786520715860",
+    "name": "General Workspace",
+    "description": "Default project workspace for managing your tasks",
+    "category": "General",
+    "color": "#d97706",
+    "isArchived": false,
+    "createdAt": "2026-08-12T07:45:15.860Z",
+    "updatedAt": "2026-08-12T07:45:15.860Z",
+    "userId": "usr-1"
+  }
+]

@@ -5,7 +5,7 @@ INSERT IGNORE INTO roles(id, name) VALUES(2, 'ROLE_ADMIN');
 INSERT IGNORE INTO users(id, name, email, password_hash, avatar_url, bio, job_title) 
 VALUES(
   'usr-1', 
-  'Alex Morgan', 
+  'demo user', 
   'alex.morgan@flowdesk.io', 
   '$2a$10$e8R60fK1gC5M1q1l2m3n4o5p6q7r8s9t0u1v2w3x4y5z', 
   'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
