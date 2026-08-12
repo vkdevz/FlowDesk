@@ -29,9 +29,15 @@ const ai = process.env.GEMINI_API_KEY
   : null;
 
 // Persistent Data Store Setup
-const DATA_DIR = path.join(process.cwd(), 'data');
-if (!fs.existsSync(DATA_DIR)) {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
+const isVercel = !!process.env.VERCEL;
+const DATA_DIR = isVercel ? '/tmp/data' : path.join(process.cwd(), 'data');
+
+try {
+  if (!fs.existsSync(DATA_DIR)) {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+  }
+} catch (err) {
+  console.warn('Could not create data directory:', err);
 }
 
 const USERS_FILE = path.join(DATA_DIR, 'users.json');
@@ -83,9 +89,15 @@ let tasks: TaskRecord[] = [];
 
 const loadData = () => {
   try {
-    if (fs.existsSync(USERS_FILE)) users = JSON.parse(fs.readFileSync(USERS_FILE, 'utf-8'));
-    if (fs.existsSync(PROJECTS_FILE)) projects = JSON.parse(fs.readFileSync(PROJECTS_FILE, 'utf-8'));
-    if (fs.existsSync(TASKS_FILE)) tasks = JSON.parse(fs.readFileSync(TASKS_FILE, 'utf-8'));
+    const defaultDataDir = path.join(process.cwd(), 'data');
+    const readPath = (file: string) => 
+      fs.existsSync(path.join(DATA_DIR, file)) 
+        ? path.join(DATA_DIR, file) 
+        : path.join(defaultDataDir, file);
+
+    if (fs.existsSync(readPath('users.json'))) users = JSON.parse(fs.readFileSync(readPath('users.json'), 'utf-8'));
+    if (fs.existsSync(readPath('projects.json'))) projects = JSON.parse(fs.readFileSync(readPath('projects.json'), 'utf-8'));
+    if (fs.existsSync(readPath('tasks.json'))) tasks = JSON.parse(fs.readFileSync(readPath('tasks.json'), 'utf-8'));
   } catch (e) {
     console.error('Error loading persistent data store:', e);
   }
