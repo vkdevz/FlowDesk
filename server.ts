@@ -100,6 +100,26 @@ const loadData = () => {
   } catch (e) {
     console.error('Error loading persistent data store:', e);
   }
+
+  // Fallback seed data in case Vercel filesystem reads fail
+  if (users.length === 0) {
+    users = [
+      {
+        "id": "usr-1",
+        "name": "demo user",
+        "email": "alex.morgan@flowdesk.io",
+        "passwordHash": "password123",
+        "avatar": "https://i.pravatar.cc/150?u=alex.morgan@flowdesk.io",
+        "roles": [
+          "ROLE_ADMIN",
+          "ROLE_USER"
+        ],
+        "bio": "Lead Engineer focusing on scalable microservices architecture.",
+        "jobTitle": "Senior Backend Architect",
+        "createdAt": "2024-11-20T10:00:00Z"
+      }
+    ];
+  }
 };
 
 const saveData = () => {
