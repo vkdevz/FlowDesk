@@ -147,6 +147,30 @@ export const AuthPage: React.FC = () => {
               <span>{loading ? 'Authenticating...' : isLogin ? 'Access Workspace' : 'Register Account'}</span>
               <ArrowRight className="w-4 h-4 text-white" />
             </button>
+
+            {isLogin && (
+              <button
+                type="button"
+                onClick={async () => {
+                  setFormData({ ...formData, email: 'alex.morgan@flowdesk.io', password: 'password123' });
+                  setError('');
+                  setLoading(true);
+                  try {
+                    await login('alex.morgan@flowdesk.io', 'password123');
+                  } catch (err: any) {
+                    console.error('Demo auth error:', err);
+                    const msg = err.response?.data?.message || err.message || 'Authentication failed.';
+                    setError(msg);
+                  } finally {
+                    setLoading(false);
+                  }
+                }}
+                disabled={loading}
+                className="w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-label font-semibold transition-all flex items-center justify-center gap-2 cursor-pointer font-sans"
+              >
+                <span>Demo Login (Recruiters / Reviewers)</span>
+              </button>
+            )}
           </form>
 
           <div className="pt-3 text-center border-t border-slate-100">
