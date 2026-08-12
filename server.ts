@@ -88,17 +88,12 @@ let defaultTasks: TaskRecord[] = [];
 
 const loadData = () => {
   try {
-    const defaultDataDir = path.join(process.cwd(), 'data');
-    const readPath = (file: string) => 
-      fs.existsSync(path.join(DATA_DIR, file)) 
-        ? path.join(DATA_DIR, file) 
-        : path.join(defaultDataDir, file);
-
-    if (fs.existsSync(readPath('users.json'))) defaultUsers = JSON.parse(fs.readFileSync(readPath('users.json'), 'utf-8'));
-    if (fs.existsSync(readPath('projects.json'))) defaultProjects = JSON.parse(fs.readFileSync(readPath('projects.json'), 'utf-8'));
-    if (fs.existsSync(readPath('tasks.json'))) defaultTasks = JSON.parse(fs.readFileSync(readPath('tasks.json'), 'utf-8'));
+    // We intentionally start with an empty slate for tasks and projects
+    // to give each visitor a fresh workspace.
+    defaultProjects = [];
+    defaultTasks = [];
   } catch (e) {
-    console.error('Error loading persistent data store:', e);
+    console.error('Error initializing empty data store:', e);
   }
 
   // Fallback seed data in case Vercel filesystem reads fail
