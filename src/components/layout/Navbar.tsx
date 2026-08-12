@@ -57,23 +57,32 @@ export const Navbar: React.FC<NavbarProps> = ({
           <span className="hidden sm:inline">AI Planner</span>
         </button>
 
-        {/* REST API Inspector Button */}
-        <button
-          onClick={onOpenInspector}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 text-label transition-colors cursor-pointer"
-        >
-          <Terminal className="w-3.5 h-3.5 text-indigo-600" />
-          <span className="hidden md:inline">API Inspector</span>
-        </button>
-
-        {/* Architecture Modal Button */}
-        <button
-          onClick={onOpenArchitecture}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 text-label transition-colors cursor-pointer"
-        >
-          <Layers className="w-3.5 h-3.5 text-emerald-600" />
-          <span className="hidden md:inline">Architecture</span>
-        </button>
+        {/* Developer Tools Dropdown */}
+        <div className="relative group">
+          <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 text-label transition-colors cursor-pointer">
+            <Terminal className="w-3.5 h-3.5 text-slate-600" />
+            <span className="hidden md:inline">Dev Tools</span>
+          </button>
+          
+          <div className="absolute right-0 mt-1 w-48 bg-white rounded-lg shadow-lg border border-slate-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+            <div className="p-1 flex flex-col gap-1">
+              <button
+                onClick={onOpenInspector}
+                className="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-slate-50 text-slate-700 text-sm w-full text-left transition-colors cursor-pointer"
+              >
+                <Terminal className="w-4 h-4 text-indigo-600" />
+                API Inspector
+              </button>
+              <button
+                onClick={onOpenArchitecture}
+                className="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-slate-50 text-slate-700 text-sm w-full text-left transition-colors cursor-pointer"
+              >
+                <Layers className="w-4 h-4 text-emerald-600" />
+                Architecture
+              </button>
+            </div>
+          </div>
+        </div>
 
         {/* User Profile / Logout */}
         {user ? (
