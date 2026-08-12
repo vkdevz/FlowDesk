@@ -2,7 +2,6 @@ import express, { Request, Response } from 'express';
 import cors from 'cors';
 import path from 'path';
 import fs from 'fs';
-import { createServer as createViteServer } from 'vite';
 import dotenv from 'dotenv';
 import { GoogleGenAI, Type } from '@google/genai';
 
@@ -141,7 +140,7 @@ const getUserIdFromReq = (req: Request): string | null => {
 // AUTH API
 apiRouter.post('/auth/login', (req: Request, res: Response) => {
   const { email, password } = req.body;
-  const user = users.find((u) => u.email.toLowerCase() === email?.trim().toLowerCase());
+  const user = users.find((u) => u.email.toLowerCase() === email?.trim()?.toLowerCase());
 
   if (!user || user.passwordHash !== password) {
     return res.status(401).json({
@@ -738,6 +737,7 @@ app.use('/api', apiRouter);
 // VITE DEV / PRODUCTION MIDDLEWARE
 async function startServer() {
   if (process.env.NODE_ENV !== 'production') {
+    const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',
